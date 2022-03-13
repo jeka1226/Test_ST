@@ -49,5 +49,4 @@ class BatchProcessingTaskIdentifierNotFound(Exception):
     Exception raised when there is no batch processing task identifier.
     """
     def __init__(self):
-        """*command* is the input command which caused the error"""
         super().__init__(f'Task identifier of batch processing mode not found.')
