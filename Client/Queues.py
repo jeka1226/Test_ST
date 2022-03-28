@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import platform
 import time
 from collections import deque
 from json import dumps
-from subprocess import Popen, DEVNULL, call
+from subprocess import Popen, DEVNULL
 import sys
 from threading import Thread
 from typing import Dict, TYPE_CHECKING, Union, Deque
@@ -47,22 +48,14 @@ class InputOutput:
 
     def start_subprocess(self):
         """
-        Creating the subprocess with result window. ONLY OS WINDOWS. CHANGE IT IF LINUX
+        Creating the subprocess with result window
         """
-        self.result_window_subprocess = Popen(['start', '/wait', sys.executable, 'ResultWindow.py'],
-                                              shell=True, stderr=DEVNULL, stdout=DEVNULL)
-
-        self.result_window_subprocess.wait()  # wait for finish
-        print('\nResultWindow closed')
-
-
-    def stop_subprocess(self):
-        """
-        Kill the subprocess with result window. ONLY OS WINDOWS. CHANGE IT IF LINUX
-        """
-        if self.event_handler.is_start_result_window:  # killing only if subprocess was created
-            call(['taskkill', '/F', '/T', '/PID', str(self.result_window_subprocess.pid)],
-                  stderr=DEVNULL, stdout=DEVNULL)
+        if platform.system() == 'Windows':
+            self.result_window_subprocess = Popen(['start', '/wait', sys.executable, 'ResultWindow.py'],
+                                                  shell=True, stderr=DEVNULL, stdout=DEVNULL)
+        if platform.system() == 'Linux':
+            self.result_window_subprocess = Popen(['gnome-terminal', '--wait', '--', sys.executable, 'sub.py'],
+                                                  shell=False, stdout=DEVNULL, stderr=DEVNULL)
 
 
     def threading_input(self):
@@ -81,8 +74,8 @@ class InputOutput:
         """
         while self.threads_is_active:
             if len(self.data_to_show) > 0:
-                data_to_send: str = self.data_to_show.pop()  # pop data from data_to_show queue
-                data_to_send = dumps([data_to_send]) + 'endofmsg'  # add end message part
+                data_to_send: list = self.data_to_show.pop()  # pop data from data_to_show queue
+                data_to_send: str = dumps(data_to_send) + 'endofmsg'  # add end message part
                 try:
                     self.event_handler.result_window_sender.send_msg(data_to_send.encode('utf-8'))  # send message
                 except TimeoutError:  # ignore TimeoutError
@@ -132,7 +125,7 @@ class Queue:
 
             self.handle_request(request)  # handle request
         except Exception as ex:  # if any exception occurred - add text of exception to the showing queue
-            self.data_to_show.appendleft(str(ex))
+            self.data_to_show.appendleft([str(ex), ''])
 
 
     def handle_request(self, request: Union[StatusRequest, ResultRequest, Task, InfoRequest]):
@@ -148,8 +141,8 @@ class Queue:
                 result_request: ResultRequest = request.generate_result_request()
                 self.wait_for_result[result_request.request_identifier_on_client] = result_request
                 # inform user about activated batch_processing_mode
-                self.data_to_show.appendleft('Batch processing mode activated. '
-                                             'Only "status" and "result" requests available')
+                self.data_to_show.appendleft(['Batch processing mode activated. '
+                                             'Only "status" and "result" requests available', ''])
         # add request to the send request queue
         self.data_to_send.appendleft(request)
 
@@ -168,7 +161,7 @@ class Queue:
                 self.event_handler.batch_processing_mode.task = response
 
             # add response to the showing queue
-            self.data_to_show.appendleft(response.show_result())
+            self.data_to_show.appendleft([response.show_result(), ''])
 
             # deactivate batch processing mode if batch processing mode is active and
             # response contain result of task solving
@@ -177,4 +170,4 @@ class Queue:
                     self.event_handler.batch_processing_mode.task.request_identifier_on_result:
                 self.event_handler.batch_processing_mode.status = False
                 self.event_handler.batch_processing_mode.task = None
-                self.data_to_show.appendleft('Batch processing mode deactivated. Response with result received ')
+                self.data_to_show.appendleft(['Batch processing mode deactivated. Response with result received ', ''])

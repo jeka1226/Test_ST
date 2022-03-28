@@ -119,7 +119,7 @@ class WorkerTask:
         """
          reverse symbols in value
         """
-        time.sleep(15)
+        time.sleep(2)
         self.result = self.data[::-1]
 
 

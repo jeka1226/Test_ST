@@ -27,6 +27,7 @@ class TCPServer:
         self.semaphore: Semaphore = Semaphore(1)  # semaphore for stdout
         self.sockets: List[Union[UserEventLoop, ResultWindowEventLoop], ...] = list()  # list of connections
         self.listen = 10  # maximum connections
+        self.is_active = True
 
     def deactivate_threads(self):
         """
@@ -39,6 +40,7 @@ class TCPServer:
         """
         wait for event loops stopped
         """
+        self.is_active = False
         self.deactivate_threads()
         for i in self.sockets:
             try:
@@ -74,7 +76,7 @@ class TCPServer:
         self.server_socket.listen(self.listen)  # set limit of connections
 
         try:
-            while True:
+            while self.is_active:
                 # Wait for connection. Timeout 0.25s is needed for interruption
                 ready_to_read, ready_to_write, in_error = select.select(
                     [self.server_socket], [], [], 0.25
@@ -89,6 +91,7 @@ class TCPServer:
                     self.sockets.append(client_handler)  # append client event loop in list
                     client_handler.thread.start()  # start client event loop
 
+            self.stop_server()  # stop all threads and server
 
         except KeyboardInterrupt:  # if user press ctrl+C
             self.stop_server()  # stop all threads and server

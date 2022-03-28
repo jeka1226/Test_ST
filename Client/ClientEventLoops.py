@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import select
 import socket
+import time
 from typing import Tuple, TYPE_CHECKING, Union
 from functools import wraps
 
@@ -33,7 +34,8 @@ class ClientEventLoop(ClientMessageHandler):
         :param client_socket: created socket descriptor
         :param address: tuple([ip: str, port: int])
         :param result_window_sender: message sender to the result window
-        :param is_start_result_window: is start result window (user defined)
+        :param is_start_result_window: if you need to automatically start result window - set True,
+                                       if you want to open this window manually - set False
         """
         super(ClientEventLoop, self).__init__(client_socket, address)
         self.request_num: int = 0  # counter of requests on client
@@ -61,7 +63,7 @@ class ClientEventLoop(ClientMessageHandler):
         """
         self.input_output.threads_is_active = False  # deactivate threads
         self.input_output.send_thread.join()  # wait for send_thread finished
-        self.input_output.stop_subprocess()  # send kill result window
+        # self.input_output.stop_subprocess()  # send kill result window
         self.input_output.result_window.join()  # wait for result_window thread finished
 
 
@@ -130,9 +132,12 @@ class ClientEventLoop(ClientMessageHandler):
                     self.batch_processing_mode.status = False
                     self.batch_processing_mode.task = None
                     # inform user about exit from batch processing mode
-                    self.queue.data_to_show.appendleft('Exit from batch processing mode')
+                    self.queue.data_to_show.appendleft(['Exit from batch processing mode',''])
                 else:
-                    self.client_socket.close()  # if not in batch processing mode, then close connection by socket
+                    self.queue.data_to_show.appendleft(['Shutdown result window', 'shutdown'])
+                    while len(self.queue.data_to_show) > 0 and self.input_output.send_thread.is_alive():
+                        time.sleep(0.1)  # wait until shutdown message will be sent
+                    self.client_socket.close()  # close connection by socket
                     return
 
             except ConnectionError as ex:  # if ConnectionError occurred, then exit from client

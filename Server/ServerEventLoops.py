@@ -121,8 +121,15 @@ class ResultWindowEventLoop(ServerMessageHandler):
             if len(ready_to_read) == 1:
                 try:
                     bytes_data: bytes = self.read_msg()  # get bytes data from server
-                    data_to_print = loads(bytes_data.decode('utf-8'))[0]  # get str from bytes
-                    self.safe_print(data_to_print)  # show data in terminal
+                    data = loads(bytes_data.decode('utf-8'))
+                    data_to_print = data[0]  # get str from bytes
+                    control_data = data[1]  # get control from bytes
+                    if data_to_print:
+                        self.safe_print(data_to_print)  # show data in terminal
+                    if control_data == 'shutdown':
+                        self.client_socket.close()
+                        self.server.is_active = False
+                        return
                 except TimeoutError:  # ignore TimeoutError
                     pass
                 except UnicodeError as ex:  # if ConnectionError occurred, inform user
